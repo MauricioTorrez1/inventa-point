@@ -1,0 +1,175 @@
+/* Tipografía Inter (cae a system-ui sin conexión). */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Acento por defecto (se sobreescribe por negocio en tiempo de ejecución).
+     Formato "R G B" para que Tailwind pueda aplicar opacidad. */
+  --accent: 99 102 241;      /* índigo alegre */
+  --accent-fg: 255 255 255;  /* texto sobre el acento */
+
+  /* Insets de área segura del dispositivo (notch / home indicator del iPad). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  color-scheme: light dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  -webkit-tap-highlight-color: transparent; /* sin flash gris al tocar */
+  overscroll-behavior: none;                /* evita "pull to refresh" accidental */
+  -webkit-text-size-adjust: 100%;           /* iOS no reescala el texto en landscape */
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+@layer base {
+  body {
+    /* Fondo claro con un velo suave del acento: limpio, alegre, no plano. */
+    @apply text-slate-900 dark:text-slate-100;
+    background-color: theme('colors.slate.50');
+    background-image:
+      radial-gradient(80rem 40rem at 110% -10%, rgb(var(--accent) / 0.10), transparent 60%),
+      radial-gradient(60rem 40rem at -10% 0%, rgb(var(--accent) / 0.06), transparent 55%);
+    background-attachment: fixed;
+  }
+  .dark body {
+    background-color: theme('colors.slate.950');
+    background-image:
+      radial-gradient(80rem 40rem at 110% -10%, rgb(var(--accent) / 0.18), transparent 60%),
+      radial-gradient(60rem 40rem at -10% 0%, rgb(var(--accent) / 0.10), transparent 55%);
+  }
+
+  /* Tipografía de números tabular para que el dinero no "baile". */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Tarjeta base: blanca, esquinas generosas, sombra suave. */
+  .card {
+    @apply rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-soft
+           backdrop-blur-sm dark:border-slate-800/70 dark:bg-slate-900/80;
+  }
+
+  /* Botón táctil base: área amplia, feedback inmediato. */
+  .btn-touch {
+    @apply inline-flex min-h-touch select-none items-center justify-center gap-2
+           rounded-2xl px-5 text-base font-semibold transition
+           active:scale-[0.97] disabled:opacity-60;
+  }
+  .btn-accent {
+    @apply btn-touch text-accent-fg shadow-soft;
+    background-image: linear-gradient(
+      135deg,
+      rgb(var(--accent)),
+      rgb(var(--accent) / 0.82)
+    );
+  }
+  .btn-neutral {
+    @apply btn-touch bg-slate-100 text-slate-700 hover:bg-slate-200
+           dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700;
+  }
+
+  /* Campo de formulario consistente. */
+  .field {
+    @apply w-full rounded-2xl border border-slate-200 bg-white/70 px-4 py-3
+           text-slate-900 outline-none transition
+           placeholder:text-slate-400 focus:border-accent focus:ring-4
+           focus:ring-[rgb(var(--accent)/0.15)]
+           dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100;
+  }
+
+  /* Etiqueta/chip suave del acento. */
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full bg-[rgb(var(--accent)/0.12)]
+           px-3 py-1 text-sm font-medium text-accent;
+  }
+}
+
+@layer utilities {
+  .pt-safe { padding-top: max(var(--safe-top), 0.75rem); }
+  .pb-safe { padding-bottom: var(--safe-bottom); }
+  .mb-safe { margin-bottom: max(var(--safe-bottom), 0.5rem); }
+}
+
+/* ---------------------------------------------------------------------------
+   Animaciones ligeras (solo opacidad y transform → 60 fps, sin reflow).
+   Duraciones cortas para que la app siga sintiéndose instantánea.
+--------------------------------------------------------------------------- */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+/* El toast queda centrado con translateX(-50%); la animación lo conserva. */
+@keyframes popCenter {
+  from { opacity: 0; transform: translateX(-50%) scale(0.92); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+@keyframes pulseSoft {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(26px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes popPlain {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in { animation: fadeInUp 0.22s ease-out both; }
+.animate-pop { animation: popCenter 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-pulse-soft { animation: pulseSoft 1.4s ease-in-out infinite; }
+/* Hojas modales que suben desde abajo (checkout, extras, editor). */
+.animate-slide-up { animation: slideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Fondo oscurecido de los modales. */
+.animate-backdrop { animation: fadeIn 0.2s ease-out both; }
+/* Aparición con un pop sutil (botón flotante del carrito, chips). */
+.animate-pop-plain { animation: popPlain 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* Cascada: los hijos de un grid/lista entran escalonados (máx ~0.3s total). */
+.stagger > * { animation: fadeInUp 0.25s ease-out both; }
+.stagger > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger > *:nth-child(2)  { animation-delay: 25ms; }
+.stagger > *:nth-child(3)  { animation-delay: 50ms; }
+.stagger > *:nth-child(4)  { animation-delay: 75ms; }
+.stagger > *:nth-child(5)  { animation-delay: 100ms; }
+.stagger > *:nth-child(6)  { animation-delay: 125ms; }
+.stagger > *:nth-child(7)  { animation-delay: 150ms; }
+.stagger > *:nth-child(8)  { animation-delay: 175ms; }
+.stagger > *:nth-child(9)  { animation-delay: 200ms; }
+.stagger > *:nth-child(10) { animation-delay: 225ms; }
+.stagger > *:nth-child(11) { animation-delay: 250ms; }
+.stagger > *:nth-child(n+12) { animation-delay: 275ms; }
+
+/* Respeta la preferencia de movimiento reducido del sistema. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-pop,
+  .animate-pulse-soft,
+  .animate-slide-up,
+  .animate-backdrop,
+  .animate-pop-plain,
+  .stagger > * {
+    animation: none;
+  }
+}

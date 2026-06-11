@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# La PWA es una SPA: todas las rutas las resuelve React Router en el cliente.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
