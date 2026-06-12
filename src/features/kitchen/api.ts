@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
@@ -19,13 +20,39 @@ export interface KitchenOrder {
   sale_items: KitchenItem[]
 }
 
-// Comandas activas (pendientes y en preparación). Se refresca por polling
-// cada 5s; la sincronización en tiempo real (Realtime) es una mejora futura.
+// Suscripción Realtime: cuando entra una venta del negocio (o cambia su
+// estado), invalida las comandas al instante. Requiere la migración 0008
+// (publicar `sales` en supabase_realtime); los eventos respetan RLS.
+export function useRealtimeCocina(tenantId: string | null) {
+  const qc = useQueryClient()
+  useEffect(() => {
+    if (!tenantId) return
+    const canal = supabase
+      .channel(`kds-${tenantId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sales',
+          filter: `tenant_id=eq.${tenantId}`,
+        },
+        () => qc.invalidateQueries({ queryKey: ['kitchen', tenantId] }),
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(canal)
+    }
+  }, [tenantId, qc])
+}
+
+// Comandas activas (pendientes y en preparación). Realtime las actualiza al
+// instante; el polling queda como respaldo por si el socket se cae.
 export function useKitchenOrders(tenantId: string | null) {
   return useQuery({
     queryKey: ['kitchen', tenantId],
     enabled: !!tenantId,
-    refetchInterval: 5000,
+    refetchInterval: 30_000,
     queryFn: async (): Promise<KitchenOrder[]> => {
       const { data, error } = await supabase
         .from('sales')

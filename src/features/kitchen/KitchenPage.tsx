@@ -1,5 +1,10 @@
 import { useAuth } from '@/features/auth/AuthProvider'
-import { useAdvanceOrder, useKitchenOrders, type KitchenOrder } from './api'
+import {
+  useAdvanceOrder,
+  useKitchenOrders,
+  useRealtimeCocina,
+  type KitchenOrder,
+} from './api'
 
 // Minutos transcurridos desde la creación, para resaltar comandas que tardan.
 function minutos(creado_en: string): number {
@@ -11,6 +16,7 @@ export function KitchenPage() {
   const tenantId = activeTenantId!
   const ordenes = useKitchenOrders(tenantId)
   const avanzar = useAdvanceOrder(tenantId)
+  useRealtimeCocina(tenantId) // comandas nuevas al instante
 
   const lista = ordenes.data ?? []
 
