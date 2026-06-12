@@ -130,14 +130,25 @@ export function SalePage() {
             <button
               key={p.id}
               onClick={() => tocarProducto(p)}
-              className="flex min-h-touch flex-col justify-between rounded-2xl bg-white p-3 text-left shadow-sm active:scale-[0.97] dark:bg-slate-900"
+              className="flex min-h-touch flex-col justify-between overflow-hidden rounded-2xl bg-white text-left shadow-sm active:scale-[0.97] dark:bg-slate-900"
             >
-              <span className="font-medium leading-tight">{p.nombre}</span>
-              <span className="mt-1 flex items-center justify-between text-sm">
-                <span className="text-accent">{money(p.precio_venta)}</span>
-                {(modsPorProducto.get(p.id)?.length ?? 0) > 0 && (
-                  <span className="text-xs text-slate-400">🧂 extras</span>
-                )}
+              {/* Foto del producto (si tiene). */}
+              {p.foto_url && (
+                <img
+                  src={p.foto_url}
+                  alt=""
+                  loading="lazy"
+                  className="h-24 w-full object-cover"
+                />
+              )}
+              <span className="flex flex-1 flex-col justify-between p-3">
+                <span className="font-medium leading-tight">{p.nombre}</span>
+                <span className="mt-1 flex items-center justify-between text-sm">
+                  <span className="text-accent">{money(p.precio_venta)}</span>
+                  {(modsPorProducto.get(p.id)?.length ?? 0) > 0 && (
+                    <span className="text-xs text-slate-400">🧂 extras</span>
+                  )}
+                </span>
               </span>
             </button>
           ))}
