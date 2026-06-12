@@ -7,7 +7,7 @@
 
   React · TypeScript · Vite · Tailwind CSS · Supabase (Postgres + RLS) · PWA
 
-  <!-- 🔗 Demo en vivo: https://TU-SITIO.netlify.app -->
+  🔗 **[Demo en vivo](https://inventapoint.netlify.app)**
 </div>
 
 ---
