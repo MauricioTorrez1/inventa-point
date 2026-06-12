@@ -7,7 +7,7 @@
 
   React · TypeScript · Vite · Tailwind CSS · Supabase (Postgres + RLS) · PWA
 
-  🔗 **[Demo en vivo](https://inventapoint.netlify.app)**
+  🔗 **[Demo en vivo](https://inventa-point.maurixio-torrez.workers.dev)**
 </div>
 
 ---
@@ -54,7 +54,7 @@ Animaciones solo de `opacity`/`transform` (cascadas, hojas modales, transiciones
 | Estado / datos | TanStack React Query, Zustand |
 | Backend (BaaS) | Supabase: Postgres + RLS, Auth, Storage, RPCs en PL/pgSQL |
 | Offline / PWA | vite-plugin-pwa (Workbox), cola en localStorage, caché de catálogo |
-| Hosting | Netlify (SPA + PWA) |
+| Hosting | Cloudflare Workers (assets estáticos + SPA), CI/CD desde GitHub |
 
 ## 🚀 Ejecutar en local
 
@@ -88,7 +88,7 @@ npm run dev
 npm run build   # genera dist/ (tsc + vite + service worker)
 ```
 
-Sube `dist/` a Netlify (el `netlify.toml` incluido ya configura el redirect de SPA). Después, en Supabase → Authentication → URL Configuration, apunta el *Site URL* a tu dominio.
+Desplegado en **Cloudflare Workers** como assets estáticos (`wrangler.jsonc` con modo SPA); cada push a `main` construye y publica automáticamente. También incluye `netlify.toml` por si se prefiere Netlify. Después del primer deploy, en Supabase → Authentication → URL Configuration, apunta el *Site URL* a tu dominio.
 
 ## 📁 Estructura
 
