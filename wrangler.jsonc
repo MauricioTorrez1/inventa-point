@@ -1,0 +1,12 @@
+// Configuración de despliegue en Cloudflare Workers (assets estáticos).
+// El build (npm run build) genera dist/ y `wrangler deploy` solo sube esos
+// archivos; el modo single-page-application sirve index.html en cualquier
+// ruta (equivalente al redirect SPA de Netlify).
+{
+  "name": "inventa-point",
+  "compatibility_date": "2026-06-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
