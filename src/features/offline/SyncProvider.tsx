@@ -37,6 +37,8 @@ async function procesar(op: OpPendiente): Promise<void> {
         p_cliente_id: op.payload.cliente_id ?? null,
         p_idempotencia: op.id,
         p_origen: 'offline_sync',
+        p_descuento: op.payload.descuento_manual ?? 0,
+        p_descuento_motivo: op.payload.descuento_motivo ?? null,
       })
       .abortSignal(controller.signal)
   } else if (op.tipo === 'gasto') {

@@ -22,11 +22,25 @@ export function useRegistrarCliente(tenantId: string) {
   })
 }
 
+// Línea de venta: la del carrito + la promo aplicada por el motor.
+export type LineaVenta = CartLine & {
+  descuento?: number
+  promo?: string | null
+}
+
+// Descuento manual del ticket (solo admin; el servidor lo re-valida).
+export interface DescuentoManual {
+  monto: number
+  motivo: string | null
+}
+
 export interface VentaInput {
-  lineas: CartLine[]
+  lineas: LineaVenta[]
   metodo_pago: MetodoPago
   monto_recibido?: number | null
   cliente_id?: string | null
+  descuento_manual?: number
+  descuento_motivo?: string | null
 }
 
 export interface VentaResultado {
@@ -49,16 +63,24 @@ export function useCreateSale(tenantId: string) {
         variante: null,
         modificadores: l.modificadores,
         notas: l.notas,
+        descuento: l.descuento ?? 0,
+        promo: l.promo ?? null,
       }))
       const payload = {
         items,
         metodo_pago: v.metodo_pago,
         monto_recibido: v.monto_recibido ?? null,
         cliente_id: v.cliente_id ?? null,
+        descuento_manual: v.descuento_manual ?? 0,
+        descuento_motivo: v.descuento_motivo ?? null,
       }
       await encolar({ id: crypto.randomUUID(), tipo: 'venta', tenantId, payload })
 
-      const total = v.lineas.reduce((s, l) => s + l.precio_unitario * l.cantidad, 0)
+      const bruto = v.lineas.reduce(
+        (s, l) => s + l.precio_unitario * l.cantidad - (l.descuento ?? 0),
+        0,
+      )
+      const total = Math.max(bruto - (v.descuento_manual ?? 0), 0)
       const cambio =
         v.metodo_pago === 'efectivo' && v.monto_recibido != null
           ? Math.max(v.monto_recibido - total, 0)

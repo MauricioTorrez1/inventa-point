@@ -10,6 +10,7 @@ import { SalePage } from '@/features/sale/SalePage'
 import { KitchenPage } from '@/features/kitchen/KitchenPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
 import { CashCutPage } from '@/features/cashcut/CashCutPage'
+import { PromosPage } from '@/features/promos/PromosPage'
 import { TeamPage } from '@/features/team/TeamPage'
 import { MorePage } from '@/app/MorePage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
@@ -92,6 +93,14 @@ export function App() {
           element={
             <RequireRole roles={['admin']}>
               <TeamPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="promos"
+          element={
+            <RequireRole roles={['admin']}>
+              <PromosPage />
             </RequireRole>
           }
         />

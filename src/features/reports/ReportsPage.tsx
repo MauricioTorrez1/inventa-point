@@ -125,6 +125,13 @@ export function ReportsPage() {
           <section className="card space-y-2">
             <h2 className="mb-1 font-semibold">Resumen contable</h2>
             <Linea etiqueta="Ingresos por ventas" valor={money(r.ingresos)} />
+            {r.descuentos > 0 && (
+              <Linea
+                etiqueta="Descuentos aplicados (info)"
+                valor={`– ${money(r.descuentos)}`}
+                tenue
+              />
+            )}
             <Linea etiqueta="Costo de productos" valor={`– ${money(r.costos)}`} tenue />
             <Linea etiqueta="Utilidad bruta" valor={money(r.utilidadBruta)} />
             <Linea etiqueta="Gastos operativos" valor={`– ${money(r.gastos)}`} tenue />
@@ -370,6 +377,7 @@ function descargarCsv(r: Reporte, periodo: Periodo, etiqueta: string, negocio: s
     [],
     ['Concepto', 'Monto'],
     ['Ingresos', r.ingresos.toFixed(2)],
+    ['Descuentos aplicados', r.descuentos.toFixed(2)],
     ['Costo de productos', r.costos.toFixed(2)],
     ['Utilidad bruta', r.utilidadBruta.toFixed(2)],
     ['Gastos', r.gastos.toFixed(2)],

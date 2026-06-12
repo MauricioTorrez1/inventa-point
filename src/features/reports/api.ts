@@ -155,6 +155,7 @@ export interface Reporte {
   costos: number
   utilidadBruta: number
   gastos: number
+  descuentos: number // promos + descuentos manuales (informativo)
   utilidadNeta: number
   numVentas: number
   ticketPromedio: number
@@ -177,7 +178,7 @@ export function useReporte(tenantId: string | null, periodo: Periodo, ancla: Dat
       const [ventasRes, gastosRes, itemsRes] = await Promise.all([
         supabase
           .from('sales')
-          .select('total, costo_total, utilidad, metodo_pago, creado_en')
+          .select('total, costo_total, utilidad, descuento_total, metodo_pago, creado_en')
           .eq('tenant_id', tenantId!)
           .eq('estado_venta', 'completada')
           .gte('creado_en', desde)
@@ -209,6 +210,7 @@ export function useReporte(tenantId: string | null, periodo: Periodo, ancla: Dat
       let ingresos = 0
       let costos = 0
       let utilidadBruta = 0
+      let descuentos = 0
       const porMetodo: Record<string, number> = {}
       const serie = plantillaBuckets(periodo, rango)
       for (const v of ventas) {
@@ -216,6 +218,7 @@ export function useReporte(tenantId: string | null, periodo: Periodo, ancla: Dat
         ingresos += total
         costos += Number(v.costo_total)
         utilidadBruta += Number(v.utilidad)
+        descuentos += Number(v.descuento_total ?? 0)
         porMetodo[v.metodo_pago] = (porMetodo[v.metodo_pago] ?? 0) + total
         const idx = indiceBucket(periodo, new Date(v.creado_en))
         if (serie[idx]) {
@@ -251,6 +254,7 @@ export function useReporte(tenantId: string | null, periodo: Periodo, ancla: Dat
         costos,
         utilidadBruta,
         gastos,
+        descuentos,
         utilidadNeta,
         numVentas,
         ticketPromedio: numVentas ? ingresos / numVentas : 0,

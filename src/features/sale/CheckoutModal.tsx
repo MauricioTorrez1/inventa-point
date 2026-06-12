@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { money } from '@/lib/format'
-import { useRegistrarCliente, type MetodoPago } from './api'
+import { useAuth } from '@/features/auth/AuthProvider'
+import { useRegistrarCliente, type DescuentoManual, type MetodoPago } from './api'
 
 const METODOS: { id: MetodoPago; label: string; icon: string }[] = [
   { id: 'efectivo', label: 'Efectivo', icon: '💵' },
@@ -31,11 +32,29 @@ export function CheckoutModal({
   procesando: boolean
   tenantId: string
   lealtad: LealtadConfig
-  onCobrar: (metodo: MetodoPago, montoRecibido: number | null, cliente: ClienteVenta | null) => void
+  onCobrar: (
+    metodo: MetodoPago,
+    montoRecibido: number | null,
+    cliente: ClienteVenta | null,
+    descuento: DescuentoManual | null,
+  ) => void
   onCancelar: () => void
 }) {
+  const { rol } = useAuth()
   const [metodo, setMetodo] = useState<MetodoPago>('efectivo')
   const [recibido, setRecibido] = useState('')
+
+  // Descuento manual del ticket: SOLO admin (el servidor también lo valida).
+  const esAdmin = rol === 'admin'
+  const [descAbierto, setDescAbierto] = useState(false)
+  const [descTipo, setDescTipo] = useState<'%' | '$'>('%')
+  const [descValor, setDescValor] = useState('')
+  const [descMotivo, setDescMotivo] = useState('')
+  const v = Number(descValor) || 0
+  const montoDescuento = esAdmin && descAbierto && v > 0
+    ? Math.min(descTipo === '%' ? (total * Math.min(v, 100)) / 100 : v, total)
+    : 0
+  const totalFinal = Math.max(total - montoDescuento, 0)
 
   // Cliente (fidelización).
   const registrar = useRegistrarCliente(tenantId)
@@ -45,11 +64,11 @@ export function CheckoutModal({
 
   const montoRecibido = recibido === '' ? null : Number(recibido)
   const cambio =
-    metodo === 'efectivo' && montoRecibido !== null ? montoRecibido - total : null
+    metodo === 'efectivo' && montoRecibido !== null ? montoRecibido - totalFinal : null
   const faltante = cambio !== null && cambio < 0
 
-  const sugeridos = [total, Math.ceil(total / 50) * 50, Math.ceil(total / 100) * 100]
-  const rapidos = [...new Set(sugeridos)].filter((n) => n >= total)
+  const sugeridos = [totalFinal, Math.ceil(totalFinal / 50) * 50, Math.ceil(totalFinal / 100) * 100]
+  const rapidos = [...new Set(sugeridos)].filter((n) => n >= totalFinal)
 
   // Progreso de lealtad. `compras` son las ya hechas (antes de esta venta).
   //   enCiclo = avance dentro del ciclo actual (0..meta-1)
@@ -73,7 +92,69 @@ export function CheckoutModal({
     <div className="animate-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-6">
       <div className="animate-slide-up max-h-full w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-6 shadow-xl dark:bg-slate-900 sm:rounded-3xl">
         <p className="text-center text-sm text-slate-500">Total a cobrar</p>
-        <p className="mb-5 text-center text-4xl font-bold tabular">{money(total)}</p>
+        <p className="mb-1 text-center text-4xl font-bold tabular">{money(totalFinal)}</p>
+        {montoDescuento > 0 && (
+          <p className="mb-1 text-center text-sm text-emerald-600">
+            Descuento −{money(montoDescuento)} <s className="text-slate-400">{money(total)}</s>
+          </p>
+        )}
+
+        {/* Descuento manual (solo admin). */}
+        {esAdmin && (
+          <div className="mb-4 mt-2">
+            {!descAbierto ? (
+              <button
+                type="button"
+                onClick={() => setDescAbierto(true)}
+                className="mx-auto block text-sm font-medium text-accent"
+              >
+                Aplicar descuento
+              </button>
+            ) : (
+              <div className="animate-fade-in space-y-2 rounded-2xl bg-slate-50 p-3 dark:bg-slate-800/40">
+                <div className="flex gap-2">
+                  <div className="flex rounded-xl bg-slate-200 p-0.5 dark:bg-slate-700">
+                    {(['%', '$'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setDescTipo(t)}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
+                          descTipo === t ? 'bg-white text-accent dark:bg-slate-900' : 'text-slate-500'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={descValor}
+                    onChange={(e) => setDescValor(e.target.value)}
+                    placeholder={descTipo === '%' ? 'ej. 10' : 'ej. 50.00'}
+                    className="field flex-1 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setDescAbierto(false); setDescValor(''); setDescMotivo('') }}
+                    className="text-sm text-slate-400"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <input
+                  value={descMotivo}
+                  onChange={(e) => setDescMotivo(e.target.value)}
+                  placeholder="Motivo (ej. cliente frecuente)"
+                  className="field py-2 text-sm"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ---- Cliente frecuente (solo si la lealtad está activa) ---- */}
         {lealtad.activa && (
@@ -193,7 +274,14 @@ export function CheckoutModal({
           </button>
           <button
             onClick={() =>
-              onCobrar(metodo, montoRecibido, cliente ? { id: cliente.id, preCompras: cliente.compras } : null)
+              onCobrar(
+                metodo,
+                montoRecibido,
+                cliente ? { id: cliente.id, preCompras: cliente.compras } : null,
+                montoDescuento > 0
+                  ? { monto: montoDescuento, motivo: descMotivo.trim() || null }
+                  : null,
+              )
             }
             disabled={procesando || faltante}
             className="btn-accent flex-1 py-3 text-base disabled:opacity-60"

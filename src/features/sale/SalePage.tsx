@@ -8,8 +8,10 @@ import {
   type Product,
 } from '@/features/catalog/api'
 import { money } from '@/lib/format'
+import { usePromos } from '@/features/promos/api'
+import { calcularPromos, type PromoAplicada } from './promoEngine'
 import { useCart, type CartLine, type CartMod } from './cartStore'
-import { useCreateSale, type MetodoPago } from './api'
+import { useCreateSale, type DescuentoManual, type MetodoPago } from './api'
 import { CheckoutModal, type ClienteVenta } from './CheckoutModal'
 
 export function SalePage() {
@@ -19,10 +21,18 @@ export function SalePage() {
   const categorias = useCategories(tenantId)
   const productos = useProducts(tenantId)
   const modificadores = useModifiers(tenantId)
+  const promos = usePromos(tenantId)
   const crearVenta = useCreateSale(tenantId)
 
   const { lineas, agregar, cambiarCantidad, quitar, limpiar, total } = useCart()
-  const totalCarrito = total()
+
+  // Promos automáticas aplicadas al carrito actual (mejor promo por línea).
+  const promosAplicadas = useMemo(
+    () => calcularPromos(lineas, promos.data ?? [], productos.data ?? []),
+    [lineas, promos.data, productos.data],
+  )
+  const ahorro = [...promosAplicadas.values()].reduce((s, p) => s + p.descuento, 0)
+  const totalCarrito = total() - ahorro
 
   const [catActiva, setCatActiva] = useState<string | null>(null)
   const [cobrando, setCobrando] = useState(false)
@@ -65,13 +75,21 @@ export function SalePage() {
     metodo: MetodoPago,
     montoRecibido: number | null,
     cliente: ClienteVenta | null,
+    descuentoManual: DescuentoManual | null,
   ) {
     try {
+      // Cada línea viaja con su promo aplicada (el servidor la re-valida).
+      const lineasConPromo = lineas.map((l) => {
+        const p = promosAplicadas.get(l.key)
+        return { ...l, descuento: p?.descuento ?? 0, promo: p?.promo ?? null }
+      })
       const venta = await crearVenta.mutateAsync({
-        lineas,
+        lineas: lineasConPromo,
         metodo_pago: metodo,
         monto_recibido: montoRecibido,
         cliente_id: cliente?.id ?? null,
+        descuento_manual: descuentoManual?.monto ?? 0,
+        descuento_motivo: descuentoManual?.motivo ?? null,
       })
 
       // ¿Esta compra cerró un ciclo de lealtad? -> premio (solo si fue online,
@@ -165,6 +183,8 @@ export function SalePage() {
         className="hidden w-80 flex-col border-l border-slate-200 dark:border-slate-800 sm:flex"
         lineas={lineas}
         total={totalCarrito}
+        ahorro={ahorro}
+        promos={promosAplicadas}
         onMas={(k) => cambiarCantidad(k, 1)}
         onMenos={(k) => cambiarCantidad(k, -1)}
         onQuitar={quitar}
@@ -190,6 +210,8 @@ export function SalePage() {
             className="animate-slide-up max-h-[75%] flex-col rounded-t-3xl bg-white dark:bg-slate-900"
             lineas={lineas}
             total={totalCarrito}
+            ahorro={ahorro}
+            promos={promosAplicadas}
             onMas={(k) => cambiarCantidad(k, 1)}
             onMenos={(k) => cambiarCantidad(k, -1)}
             onQuitar={quitar}
@@ -400,6 +422,8 @@ function CartPanel({
   className,
   lineas,
   total,
+  ahorro,
+  promos,
   onMas,
   onMenos,
   onQuitar,
@@ -409,6 +433,8 @@ function CartPanel({
   className: string
   lineas: CartLine[]
   total: number
+  ahorro: number
+  promos: Map<string, PromoAplicada>
   onMas: (key: string) => void
   onMenos: (key: string) => void
   onQuitar: (key: string) => void
@@ -454,6 +480,11 @@ function CartPanel({
                 {l.notas && (
                   <p className="mt-0.5 text-xs italic text-amber-600">📝 {l.notas}</p>
                 )}
+                {promos.has(l.key) && (
+                  <p className="mt-0.5 text-xs font-medium text-emerald-600">
+                    ✨ {promos.get(l.key)!.promo} · −{money(promos.get(l.key)!.descuento)}
+                  </p>
+                )}
 
                 <div className="mt-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -480,9 +511,15 @@ function CartPanel({
       </div>
 
       <div className="border-t border-slate-200 p-4 dark:border-slate-800">
+        {ahorro > 0 && (
+          <div className="mb-1 flex items-center justify-between text-sm text-emerald-600">
+            <span>✨ Ahorro por promos</span>
+            <span className="tabular">−{money(ahorro)}</span>
+          </div>
+        )}
         <div className="mb-3 flex items-center justify-between text-lg font-bold">
           <span>Total</span>
-          <span>{money(total)}</span>
+          <span className="tabular">{money(total)}</span>
         </div>
         <button
           onClick={onCobrar}
