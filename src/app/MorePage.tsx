@@ -10,6 +10,7 @@ interface Acceso {
 
 const ACCESOS: Acceso[] = [
   { to: '/cocina', icon: '🍳', titulo: 'Cocina', desc: 'Pantalla de preparación (KDS)' },
+  { to: '/contabilidad', icon: '📒', titulo: 'Contabilidad', desc: 'Cuentas por pagar, flujo de caja, gastos e inventario' },
   { to: '/caja', icon: '💵', titulo: 'Corte de caja', desc: 'Arqueo de efectivo del turno' },
   { to: '/promos', icon: '🏷️', titulo: 'Promociones', desc: 'Descuentos, 2x1, precios especiales' },
   { to: '/combos', icon: '🎁', titulo: 'Combos', desc: 'Paquetes armables con precio especial' },

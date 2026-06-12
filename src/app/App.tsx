@@ -9,6 +9,7 @@ import { CatalogPage } from '@/features/catalog/CatalogPage'
 import { SalePage } from '@/features/sale/SalePage'
 import { KitchenPage } from '@/features/kitchen/KitchenPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
+import { AccountingPage } from '@/features/accounting/AccountingPage'
 import { CashCutPage } from '@/features/cashcut/CashCutPage'
 import { PromosPage } from '@/features/promos/PromosPage'
 import { CombosPage } from '@/features/combos/CombosPage'
@@ -78,6 +79,14 @@ export function App() {
           element={
             <RequireRole roles={['admin']}>
               <ReportsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="contabilidad"
+          element={
+            <RequireRole roles={['admin']}>
+              <AccountingPage />
             </RequireRole>
           }
         />
