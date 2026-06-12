@@ -11,6 +11,7 @@ import { KitchenPage } from '@/features/kitchen/KitchenPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
 import { CashCutPage } from '@/features/cashcut/CashCutPage'
 import { PromosPage } from '@/features/promos/PromosPage'
+import { CombosPage } from '@/features/combos/CombosPage'
 import { TeamPage } from '@/features/team/TeamPage'
 import { MorePage } from '@/app/MorePage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
@@ -101,6 +102,14 @@ export function App() {
           element={
             <RequireRole roles={['admin']}>
               <PromosPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="combos"
+          element={
+            <RequireRole roles={['admin']}>
+              <CombosPage />
             </RequireRole>
           }
         />

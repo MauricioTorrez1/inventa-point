@@ -9,6 +9,8 @@ export interface CartMod {
 // Una línea del carrito. `key` es un id local (no persiste) para diferenciar
 // el mismo producto añadido con extras o notas distintas.
 // `precio_unitario` YA incluye los extras (base + suma de modificadores).
+// `descuento`/`promo` se fijan al agregar SOLO en líneas de combo (prorrateo);
+// para el resto, las promos automáticas las calcula el promoEngine al vuelo.
 export interface CartLine {
   key: string
   product_id: string | null
@@ -17,6 +19,8 @@ export interface CartLine {
   cantidad: number
   modificadores: CartMod[]
   notas: string | null
+  descuento: number
+  promo: string | null
 }
 
 interface CartState {
@@ -28,6 +32,8 @@ interface CartState {
     precio_unitario: number
     modificadores?: CartMod[]
     notas?: string | null
+    descuento?: number
+    promo?: string | null
   }) => void
   cambiarCantidad: (key: string, delta: number) => void
   setNotas: (key: string, notas: string) => void
@@ -47,11 +53,18 @@ export const useCart = create<CartState>((set, get) => ({
     set((s) => {
       const mods = p.modificadores ?? []
       const notas = p.notas?.trim() || null
-      // Solo se fusionan líneas "simples" (sin extras ni notas) del mismo
-      // producto; con personalización, cada adición es una línea propia.
-      if (mods.length === 0 && !notas) {
+      const descuento = p.descuento ?? 0
+      const promo = p.promo ?? null
+      // Solo se fusionan líneas "simples" (sin extras, notas ni combo) del
+      // mismo producto; con personalización, cada adición es una línea propia.
+      if (mods.length === 0 && !notas && descuento === 0 && !promo) {
         const existente = s.lineas.find(
-          (l) => l.product_id === p.product_id && l.modificadores.length === 0 && !l.notas,
+          (l) =>
+            l.product_id === p.product_id &&
+            l.modificadores.length === 0 &&
+            !l.notas &&
+            l.descuento === 0 &&
+            !l.promo,
         )
         if (existente) {
           return {
@@ -73,6 +86,8 @@ export const useCart = create<CartState>((set, get) => ({
             cantidad: 1,
             modificadores: mods,
             notas,
+            descuento,
+            promo,
           },
         ],
       }

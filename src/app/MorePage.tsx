@@ -12,6 +12,7 @@ const ACCESOS: Acceso[] = [
   { to: '/cocina', icon: '🍳', titulo: 'Cocina', desc: 'Pantalla de preparación (KDS)' },
   { to: '/caja', icon: '💵', titulo: 'Corte de caja', desc: 'Arqueo de efectivo del turno' },
   { to: '/promos', icon: '🏷️', titulo: 'Promociones', desc: 'Descuentos, 2x1, precios especiales' },
+  { to: '/combos', icon: '🎁', titulo: 'Combos', desc: 'Paquetes armables con precio especial' },
   { to: '/equipo', icon: '👥', titulo: 'Equipo', desc: 'Invitar y gestionar roles' },
   { to: '/ajustes', icon: '⚙️', titulo: 'Ajustes', desc: 'Marca, moneda y logo del negocio' },
 ]

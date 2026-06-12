@@ -77,6 +77,9 @@ function OrderCard({
         {orden.sale_items.map((it) => (
           <li key={it.id} className="text-sm">
             <span className="font-semibold">{it.cantidad}×</span> {it.nombre_snapshot}
+            {it.promo_nombre && (
+              <span className="ml-1 text-xs text-slate-400">({it.promo_nombre})</span>
+            )}
             {(it.modificadores?.length ?? 0) > 0 && (
               <span className="mt-0.5 block pl-5 text-xs font-medium text-accent">
                 {it.modificadores.map((m) => m.nombre).join(' · ')}

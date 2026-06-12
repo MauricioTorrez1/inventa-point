@@ -10,6 +10,7 @@ export interface KitchenItem {
   cantidad: number
   modificadores: { nombre: string; precio: number }[]
   notas: string | null
+  promo_nombre: string | null // combo/promo al que pertenece la partida
 }
 
 export interface KitchenOrder {
@@ -57,7 +58,7 @@ export function useKitchenOrders(tenantId: string | null) {
       const { data, error } = await supabase
         .from('sales')
         .select(
-          'id, folio, estado_cocina, creado_en, sale_items(id, nombre_snapshot, cantidad, modificadores, notas)',
+          'id, folio, estado_cocina, creado_en, sale_items(id, nombre_snapshot, cantidad, modificadores, notas, promo_nombre)',
         )
         .in('estado_cocina', ['pendiente', 'en_preparacion'])
         .eq('estado_venta', 'completada')

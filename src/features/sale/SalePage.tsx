@@ -9,6 +9,7 @@ import {
 } from '@/features/catalog/api'
 import { money } from '@/lib/format'
 import { usePromos } from '@/features/promos/api'
+import { useCombos, type Combo } from '@/features/combos/api'
 import { calcularPromos, type PromoAplicada } from './promoEngine'
 import { useCart, type CartLine, type CartMod } from './cartStore'
 import { useCreateSale, type DescuentoManual, type MetodoPago } from './api'
@@ -22,16 +23,25 @@ export function SalePage() {
   const productos = useProducts(tenantId)
   const modificadores = useModifiers(tenantId)
   const promos = usePromos(tenantId)
+  const combos = useCombos(tenantId)
   const crearVenta = useCreateSale(tenantId)
 
   const { lineas, agregar, cambiarCantidad, quitar, limpiar, total } = useCart()
 
-  // Promos automáticas aplicadas al carrito actual (mejor promo por línea).
+  // Promos automáticas: solo sobre líneas sin descuento propio (los combos
+  // ya traen el suyo prorrateado; no se acumulan).
   const promosAplicadas = useMemo(
-    () => calcularPromos(lineas, promos.data ?? [], productos.data ?? []),
+    () =>
+      calcularPromos(
+        lineas.filter((l) => l.descuento === 0 && !l.promo),
+        promos.data ?? [],
+        productos.data ?? [],
+      ),
     [lineas, promos.data, productos.data],
   )
-  const ahorro = [...promosAplicadas.values()].reduce((s, p) => s + p.descuento, 0)
+  const ahorroPromos = [...promosAplicadas.values()].reduce((s, p) => s + p.descuento, 0)
+  const ahorroCombos = lineas.reduce((s, l) => s + l.descuento, 0)
+  const ahorro = ahorroPromos + ahorroCombos
   const totalCarrito = total() - ahorro
 
   const [catActiva, setCatActiva] = useState<string | null>(null)
@@ -39,6 +49,11 @@ export function SalePage() {
   const [carritoAbierto, setCarritoAbierto] = useState(false)
   // Producto cuyo diálogo de extras está abierto (si tiene modificadores).
   const [conOpciones, setConOpciones] = useState<Product | null>(null)
+  // Combo cuyo diálogo de armado está abierto.
+  const [comboAbierto, setComboAbierto] = useState<Combo | null>(null)
+
+  const COMBOS_TAB = '__combos__'
+  const combosActivos = (combos.data ?? []).filter((c) => c.activo)
   const [ultima, setUltima] = useState<{
     cambio: number | null
     premio: string | null
@@ -78,8 +93,10 @@ export function SalePage() {
     descuentoManual: DescuentoManual | null,
   ) {
     try {
-      // Cada línea viaja con su promo aplicada (el servidor la re-valida).
+      // Cada línea viaja con su descuento: el propio (combo, prorrateado al
+      // agregar) o el de la promo automática (el servidor lo re-valida).
       const lineasConPromo = lineas.map((l) => {
+        if (l.descuento > 0 || l.promo) return l
         const p = promosAplicadas.get(l.key)
         return { ...l, descuento: p?.descuento ?? 0, promo: p?.promo ?? null }
       })
@@ -126,6 +143,18 @@ export function SalePage() {
           >
             Todo
           </button>
+          {combosActivos.length > 0 && (
+            <button
+              onClick={() => setCatActiva(COMBOS_TAB)}
+              className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm ${
+                catActiva === COMBOS_TAB
+                  ? 'bg-accent text-accent-fg'
+                  : 'bg-slate-200 dark:bg-slate-800'
+              }`}
+            >
+              🎁 Combos
+            </button>
+          )}
           {categorias.data?.map((c) => (
             <button
               key={c.id}
@@ -139,12 +168,21 @@ export function SalePage() {
           ))}
         </div>
 
-        {/* Grid de productos (la cascada se reinicia al cambiar de categoría) */}
+        {/* Grid de productos o combos (la cascada se reinicia al cambiar de pestaña) */}
         <div
           key={catActiva ?? 'todo'}
           className="stagger grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto p-3 sm:grid-cols-3 lg:grid-cols-4"
         >
-          {filtrados.map((p) => (
+          {catActiva === COMBOS_TAB &&
+            combosActivos.map((c) => (
+              <ComboCard
+                key={c.id}
+                combo={c}
+                productos={disponibles}
+                onTocar={() => setComboAbierto(c)}
+              />
+            ))}
+          {catActiva !== COMBOS_TAB && filtrados.map((p) => (
             <button
               key={p.id}
               onClick={() => tocarProducto(p)}
@@ -170,7 +208,7 @@ export function SalePage() {
               </span>
             </button>
           ))}
-          {filtrados.length === 0 && (
+          {catActiva !== COMBOS_TAB && filtrados.length === 0 && (
             <p className="col-span-full mt-8 text-center text-sm text-slate-500">
               {productos.isLoading ? 'Cargando…' : 'No hay productos disponibles.'}
             </p>
@@ -219,6 +257,20 @@ export function SalePage() {
             onCobrar={() => setCobrando(true)}
           />
         </div>
+      )}
+
+      {/* Diálogo de armado de combo. */}
+      {comboAbierto && (
+        <ComboDialog
+          combo={comboAbierto}
+          productos={disponibles}
+          categorias={categorias.data ?? []}
+          onAgregar={(componentes) => {
+            for (const c of componentes) agregar(c)
+            setComboAbierto(null)
+          }}
+          onCancelar={() => setComboAbierto(null)}
+        />
       )}
 
       {/* Diálogo de extras y especificaciones a cocina. */}
@@ -272,6 +324,194 @@ export function SalePage() {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ---- Combos: tarjeta y diálogo de armado ----
+
+// Línea que el combo agrega al carrito (componente real con su prorrateo).
+interface ComponenteCombo {
+  product_id: string
+  nombre: string
+  precio_unitario: number
+  descuento: number
+  promo: string
+}
+
+function ComboCard({
+  combo,
+  productos,
+  onTocar,
+}: {
+  combo: Combo
+  productos: Product[]
+  onTocar: () => void
+}) {
+  // Valor de referencia: suma de precios regulares (mínimos por categoría).
+  const referencia = combo.combo_slots.reduce((s, slot) => {
+    if (slot.producto_id) {
+      return s + (productos.find((p) => p.id === slot.producto_id)?.precio_venta ?? 0)
+    }
+    const deCat = productos.filter((p) => p.categoria_id === slot.categoria_id)
+    return s + (deCat.length ? Math.min(...deCat.map((p) => p.precio_venta)) : 0)
+  }, 0)
+  const ahorra = Math.max(referencia - combo.precio, 0)
+
+  return (
+    <button
+      onClick={onTocar}
+      className="flex min-h-touch flex-col justify-between rounded-2xl border-2 border-[rgb(var(--accent)/0.35)] bg-white p-3 text-left shadow-sm active:scale-[0.97] dark:bg-slate-900"
+    >
+      <span className="font-medium leading-tight">🎁 {combo.nombre}</span>
+      <span className="mt-1 flex items-center justify-between text-sm">
+        <span className="font-semibold text-accent">{money(combo.precio)}</span>
+        {ahorra > 0 && (
+          <span className="text-xs text-emerald-600">ahorra {money(ahorra)}</span>
+        )}
+      </span>
+    </button>
+  )
+}
+
+function ComboDialog({
+  combo,
+  productos,
+  categorias,
+  onAgregar,
+  onCancelar,
+}: {
+  combo: Combo
+  productos: Product[]
+  categorias: { id: string; nombre: string }[]
+  onAgregar: (componentes: ComponenteCombo[]) => void
+  onCancelar: () => void
+}) {
+  // Elección por slot (los fijos quedan resueltos de antemano).
+  const [eleccion, setEleccion] = useState<Record<string, string>>(() => {
+    const ini: Record<string, string> = {}
+    for (const s of combo.combo_slots) {
+      if (s.producto_id) ini[s.id] = s.producto_id
+    }
+    return ini
+  })
+
+  const productoDe = (id: string | undefined) => productos.find((p) => p.id === id)
+  const completo = combo.combo_slots.every((s) => !!eleccion[s.id])
+
+  // Suma regular de lo elegido (para mostrar el ahorro real).
+  const elegidos = combo.combo_slots
+    .map((s) => productoDe(eleccion[s.id]))
+    .filter((p): p is Product => !!p)
+  const suma = elegidos.reduce((s, p) => s + p.precio_venta, 0)
+  const ahorroReal = Math.max(suma - combo.precio, 0)
+
+  // Prorrateo: cada componente conserva su precio regular y recibe un
+  // descuento proporcional; el último absorbe el ajuste de redondeo para que
+  // el total quede EXACTO en el precio del combo. (Si el combo costara más
+  // que la suma, no se recarga: los descuentos se quedan en 0.)
+  function confirmar() {
+    if (!completo || elegidos.length !== combo.combo_slots.length) return
+    const factor = suma > 0 ? Math.min(combo.precio / suma, 1) : 1
+    let acumulado = 0
+    const componentes: ComponenteCombo[] = elegidos.map((p, i) => {
+      const esUltimo = i === elegidos.length - 1
+      const finalLinea = esUltimo
+        ? Math.max(Math.min(combo.precio, suma) - acumulado, 0)
+        : Math.round(p.precio_venta * factor * 100) / 100
+      acumulado += finalLinea
+      return {
+        product_id: p.id,
+        nombre: p.nombre,
+        precio_unitario: p.precio_venta,
+        descuento: Math.round((p.precio_venta - finalLinea) * 100) / 100,
+        promo: combo.nombre,
+      }
+    })
+    onAgregar(componentes)
+  }
+
+  return (
+    <div className="animate-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-6">
+      <div className="animate-slide-up max-h-[85%] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-6 shadow-xl dark:bg-slate-900 sm:rounded-3xl">
+        <h2 className="text-lg font-bold">🎁 {combo.nombre}</h2>
+        <p className="mb-4 text-sm text-slate-500">Arma el combo</p>
+
+        <div className="space-y-4">
+          {combo.combo_slots.map((slot) => {
+            // Producto fijo: solo se muestra como incluido.
+            if (slot.producto_id) {
+              const p = productoDe(slot.producto_id)
+              return (
+                <div
+                  key={slot.id}
+                  className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-2.5 text-sm dark:bg-slate-800/40"
+                >
+                  <span>✓ {p?.nombre ?? 'Producto'}</span>
+                  <span className="text-xs text-slate-400">incluido</span>
+                </div>
+              )
+            }
+            // Elección de la categoría.
+            const opciones = productos.filter((p) => p.categoria_id === slot.categoria_id)
+            const titulo =
+              slot.etiqueta?.trim() ||
+              `Elige de ${categorias.find((c) => c.id === slot.categoria_id)?.nombre ?? 'la categoría'}`
+            return (
+              <div key={slot.id}>
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  {titulo}
+                </p>
+                {opciones.length === 0 ? (
+                  <p className="text-sm text-slate-400">Sin productos disponibles.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {opciones.map((p) => {
+                      const activo = eleccion[slot.id] === p.id
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setEleccion((e) => ({ ...e, [slot.id]: p.id }))}
+                          className={`flex w-full items-center justify-between rounded-2xl border px-4 py-2.5 text-sm transition ${
+                            activo
+                              ? 'border-accent bg-[rgb(var(--accent)/0.1)] font-medium text-accent'
+                              : 'border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <span>{p.nombre}</span>
+                          <span className={activo ? '' : 'text-slate-400'}>
+                            {money(p.precio_venta)}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {completo && ahorroReal > 0 && (
+          <p className="mt-4 text-center text-sm font-medium text-emerald-600">
+            ✨ Ahorras {money(ahorroReal)} vs. comprar por separado
+          </p>
+        )}
+
+        <div className="mt-5 flex gap-3">
+          <button onClick={onCancelar} className="btn-neutral flex-1 py-3">
+            Cancelar
+          </button>
+          <button
+            onClick={confirmar}
+            disabled={!completo}
+            className="btn-accent flex-1 py-3 disabled:opacity-50"
+          >
+            Agregar · {money(Math.min(combo.precio, suma || combo.precio))}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -485,23 +725,35 @@ function CartPanel({
                     ✨ {promos.get(l.key)!.promo} · −{money(promos.get(l.key)!.descuento)}
                   </p>
                 )}
+                {l.promo && (
+                  <p className="mt-0.5 text-xs font-medium text-emerald-600">
+                    🎁 {l.promo}
+                    {l.descuento > 0 && <> · −{money(l.descuento)}</>}
+                  </p>
+                )}
 
                 <div className="mt-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onMenos(l.key)}
-                      className="h-8 w-8 rounded-lg bg-white text-lg dark:bg-slate-700"
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center font-semibold">{l.cantidad}</span>
-                    <button
-                      onClick={() => onMas(l.key)}
-                      className="h-8 w-8 rounded-lg bg-white text-lg dark:bg-slate-700"
-                    >
-                      +
-                    </button>
-                  </div>
+                  {/* Las líneas de combo tienen cantidad fija (su descuento
+                      está prorrateado); para otro combo, se toca de nuevo. */}
+                  {l.promo ? (
+                    <span className="text-xs text-slate-400">parte del combo</span>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onMenos(l.key)}
+                        className="h-8 w-8 rounded-lg bg-white text-lg dark:bg-slate-700"
+                      >
+                        −
+                      </button>
+                      <span className="w-6 text-center font-semibold">{l.cantidad}</span>
+                      <button
+                        onClick={() => onMas(l.key)}
+                        className="h-8 w-8 rounded-lg bg-white text-lg dark:bg-slate-700"
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
                   <span className="font-semibold tabular">{money(l.precio_unitario * l.cantidad)}</span>
                 </div>
               </li>
